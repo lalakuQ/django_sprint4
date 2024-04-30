@@ -1,9 +1,13 @@
+
+from typing import Any
 from django.db.models.query import QuerySet
 from django.shortcuts import render
 from django.http import Http404
+from django.core.paginator import Paginator
 from django.core.exceptions import ObjectDoesNotExist
 from django.contrib.auth import get_user_model
-from django.views.generic import DetailView, CreateView, UpdateView
+from django.views.generic import DetailView, CreateView, UpdateView, ListView
+from django.views.generic.list import MultipleObjectMixin
 from django.utils import timezone
 from .models import Post, Category
 
@@ -11,20 +15,26 @@ from .models import Post, Category
 User = get_user_model()
 
 
-class ProfileDetailView(DetailView):
-    model = User
+class ProfileListView(ListView):
+    model = Post
     slug_url_kwarg = 'username'
     slug_field = 'username'
     template_name = 'blog/profile.html'
+    paginate_by = 10
 
-    def get_context_data(self, **kwargs):
-        username = kwargs['object']
-        posts = Post.objects.select_related(
-            'author', 'location', 'category').filter(author=username)
-        user = User.objects.get(username=username)
+    def get_queryset(self):
+        queryset = Post.objects.select_related(
+            'author', 'location', 'category').filter(
+                author__username=self.kwargs['username'])
 
-        context = {'profile': user,
-                   'page_obj': posts}
+        return queryset
+
+    def get_context_data(self):
+        context = super().get_context_data()
+        user = User.objects.get(username=self.kwargs['username'])
+        context.update({
+            'profile': user,
+        })
         return context
 
 
@@ -40,9 +50,12 @@ class EditProfileView(UpdateView):
 def index(request):
     date_now = timezone.now()
     template_name = 'blog/index.html'
-    post_list = Post.objects.custom_filter(date_now)[:5]
+    post_list = Post.objects.custom_filter(date_now)
+    paginator = Paginator(post_list, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
     context = {
-        'post_list': post_list,
+        'page_obj': page_obj,
     }
     return render(request, template_name, context)
 
@@ -67,11 +80,14 @@ def category_posts(request, category_slug):
     template_name = 'blog/category.html'
     category = Category.objects.get(slug=category_slug)
     post_list = category.posts.custom_filter(date_now)
+    paginator = Paginator(post_list, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
     if not post_list:
         raise Http404
     context = { 
         'category': category,
-        'post_list': post_list,
+        'page_obj': page_obj,
     }
     return render(request, template_name, context)
 
