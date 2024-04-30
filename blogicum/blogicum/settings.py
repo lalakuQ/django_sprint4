@@ -23,10 +23,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-c9=bv-xng1ukfdnrj3rx*co=(o=_(-4!lv)_c&h9g5#8@&uhzq'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
-ALLOWED_HOSTS = []
-
+ALLOWED_HOSTS = ['localhost', '127.0.0.1',]
 
 # Application definition
 
@@ -136,3 +135,5 @@ STATICFILES_DIRS = [
 INTERNAL_IPS = [
     '127.0.0.1',
 ]
+
+CSRF_FAILURE_VIEW = 'pages.views.csrf_failure'

@@ -21,6 +21,9 @@ from django.urls import path, include, reverse_lazy
 from django.conf import settings
 
 
+handler404 = 'pages.views.page_not_found'
+handler500 = 'pages.views.server_error'
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('blog.urls')),
@@ -33,7 +36,6 @@ urlpatterns = [
         name='registration'
     ),
     path('auth/', include('django.contrib.auth.urls')),
-    
 ]
 
 if settings.DEBUG:
