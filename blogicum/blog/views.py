@@ -1,4 +1,3 @@
-from typing import Any
 from django.db.models.query import QuerySet
 from django.shortcuts import render
 from django.http import Http404
@@ -18,8 +17,14 @@ class ProfileDetailView(DetailView):
     slug_field = 'username'
     template_name = 'blog/profile.html'
 
-    def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
-        context = {'profile': User.objects.get(username=kwargs['object'])}
+    def get_context_data(self, **kwargs):
+        username = kwargs['object']
+        posts = Post.objects.select_related(
+            'author', 'location', 'category').filter(author=username)
+        user = User.objects.get(username=username)
+
+        context = {'profile': user,
+                   'page_obj': posts}
         return context
 
 
