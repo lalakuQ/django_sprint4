@@ -1,12 +1,12 @@
-
-from typing import Any
+from django.db.models.base import Model as Model
 from django.db.models.query import QuerySet
 from django.shortcuts import render
 from django.http import Http404
+from django.urls import reverse_lazy, reverse
 from django.core.paginator import Paginator
 from django.core.exceptions import ObjectDoesNotExist
 from django.contrib.auth import get_user_model
-from django.views.generic import DetailView, CreateView, UpdateView, ListView
+from django.views.generic import DetailView, CreateView, UpdateView, ListView, TemplateView
 from django.views.generic.list import MultipleObjectMixin
 from django.utils import timezone
 from .models import Post, Category
@@ -17,8 +17,6 @@ User = get_user_model()
 
 class ProfileListView(ListView):
     model = Post
-    slug_url_kwarg = 'username'
-    slug_field = 'username'
     template_name = 'blog/profile.html'
     paginate_by = 10
 
@@ -42,9 +40,19 @@ class CreatePostView(CreateView):
     pass
 
 
-class EditProfileView(UpdateView):
-    model = User
-    template_name = 'blog/profile.html'
+class ProfileUpdateView(UpdateView):
+    template_name = 'blog/user.html'
+    fields = ('username',
+              'first_name',
+              'last_name',
+              'email')
+
+    def get_object(self):
+        return self.request.user
+
+    def get_success_url(self):
+        return reverse('blog:profile', kwargs={
+            'username': self.get_object().username})
 
 
 def index(request):

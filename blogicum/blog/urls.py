@@ -10,8 +10,8 @@ urlpatterns = [
     path('posts/create/', views.CreatePostView.as_view(), name='create_post'),
     path('category/<slug:category_slug>/', views.category_posts,
          name='category_posts'),
+    path('profile/edit/', views.ProfileUpdateView.as_view(),
+         name='edit_profile'),
     path('profile/<slug:username>/', views.ProfileListView.as_view(),
          name='profile'),
-    path('profile/edit/', views.EditProfileView.as_view(),
-         name='edit_profile'),
 ]
