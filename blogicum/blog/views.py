@@ -1,4 +1,4 @@
-from django.db.models.base import Model as Model
+from django.db.models.base import Model
 from django.db.models.query import QuerySet
 from django.shortcuts import render
 from django.http import Http404
@@ -6,8 +6,8 @@ from django.urls import reverse_lazy, reverse
 from django.core.paginator import Paginator
 from django.core.exceptions import ObjectDoesNotExist
 from django.contrib.auth import get_user_model
-from django.views.generic import DetailView, CreateView, UpdateView, ListView, TemplateView
-from django.views.generic.list import MultipleObjectMixin
+from django.views.generic import CreateView, UpdateView, ListView, TemplateView
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.utils import timezone
 from .models import Post, Category
 from .forms import CreateForm
@@ -21,10 +21,18 @@ class ProfileListView(ListView):
     paginate_by = 10
 
     def get_queryset(self):
-        queryset = Post.objects.select_related(
-            'author', 'location', 'category').filter(
-                author__username=self.kwargs['username']).order_by('-pub_date')
+        date_now = timezone.now()
+        user = User.objects.get(username=self.kwargs['username'])
 
+        if self.request.user != user:
+            queryset = Post.objects.custom_filter(date_now).filter(
+                author=user)
+        else:
+            queryset = Post.objects.select_related(
+                'location', 'category', 'author').filter(
+                author=user
+            )
+        queryset = queryset.order_by('-pub_date')
         return queryset
 
     def get_context_data(self):
@@ -36,11 +44,12 @@ class ProfileListView(ListView):
         return context
 
 
-class CreatePostView(CreateView):
+class CreatePostView(LoginRequiredMixin, CreateView):
     model = Post
     form_class = CreateForm
+    exclude = ('author',)
     template_name = 'blog/create.html'
-    success_url = reverse_lazy('blog:index')
+    login_url = '/auth/login/'
 
     def get_object(self):
         return self.request.user
@@ -48,6 +57,11 @@ class CreatePostView(CreateView):
     def form_valid(self, form):
         form.instance.author = self.request.user
         return super().form_valid(form)
+
+    def get_success_url(self):
+        return reverse('blog:profile', kwargs={
+            'username': self.get_object().username}
+        )
 
 
 class ProfileUpdateView(UpdateView):
