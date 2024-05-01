@@ -6,13 +6,20 @@ from django.urls import reverse_lazy, reverse
 from django.core.paginator import Paginator
 from django.core.exceptions import ObjectDoesNotExist
 from django.contrib.auth import get_user_model
-from django.views.generic import CreateView, UpdateView, ListView, TemplateView
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.views.generic import CreateView, UpdateView, ListView, TemplateView, DeleteView
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.utils import timezone
 from .models import Post, Category
-from .forms import CreateForm
+from .forms import PostForm
 
 User = get_user_model()
+
+
+class OnlyAuthorMixin(UserPassesTestMixin):
+
+    def test_func(self):
+        object = self.get_object()
+        return object == self.request.user
 
 
 class ProfileListView(ListView):
@@ -44,10 +51,22 @@ class ProfileListView(ListView):
         return context
 
 
+class PostUpdateView(OnlyAuthorMixin, UpdateView):
+    model = Post
+    form_class = PostForm
+    template_name = 'blog/detail.html'
+
+    def get_object(self):
+        return self.request.user
+
+    def form_valid(self, form):
+        form.instance.author = self.request.user
+        return super().form_valid(form)
+
+
 class CreatePostView(LoginRequiredMixin, CreateView):
     model = Post
-    form_class = CreateForm
-    exclude = ('author',)
+    form_class = PostForm
     template_name = 'blog/create.html'
     login_url = '/auth/login/'
 
@@ -77,6 +96,14 @@ class ProfileUpdateView(UpdateView):
     def get_success_url(self):
         return reverse('blog:profile', kwargs={
             'username': self.get_object().username})
+
+
+class PostDeleteView(DeleteView):
+    model = Post
+
+
+class CommentCreateView(CreateView):
+    pass
 
 
 def index(request):
