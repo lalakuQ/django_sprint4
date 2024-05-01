@@ -49,6 +49,7 @@ class Post(BaseModel):
         null=True,
         related_name='posts',
     )
+    image = models.ImageField('Фото', blank=True, upload_to='post_images')
     title = models.CharField(max_length=256, verbose_name='Заголовок')
     text = models.TextField(verbose_name='Текст')
     pub_date = models.DateTimeField(

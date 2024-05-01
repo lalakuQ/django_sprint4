@@ -10,7 +10,7 @@ from django.views.generic import DetailView, CreateView, UpdateView, ListView, T
 from django.views.generic.list import MultipleObjectMixin
 from django.utils import timezone
 from .models import Post, Category
-
+from .forms import CreateForm
 
 User = get_user_model()
 
@@ -23,7 +23,7 @@ class ProfileListView(ListView):
     def get_queryset(self):
         queryset = Post.objects.select_related(
             'author', 'location', 'category').filter(
-                author__username=self.kwargs['username'])
+                author__username=self.kwargs['username']).order_by('-pub_date')
 
         return queryset
 
@@ -37,7 +37,17 @@ class ProfileListView(ListView):
 
 
 class CreatePostView(CreateView):
-    pass
+    model = Post
+    form_class = CreateForm
+    template_name = 'blog/create.html'
+    success_url = reverse_lazy('blog:index')
+
+    def get_object(self):
+        return self.request.user
+
+    def form_valid(self, form):
+        form.instance.author = self.request.user
+        return super().form_valid(form)
 
 
 class ProfileUpdateView(UpdateView):
@@ -93,7 +103,7 @@ def category_posts(request, category_slug):
     page_obj = paginator.get_page(page_number)
     if not post_list:
         raise Http404
-    context = { 
+    context = {
         'category': category,
         'page_obj': page_obj,
     }
