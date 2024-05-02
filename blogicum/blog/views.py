@@ -1,4 +1,5 @@
 from django.db.models.base import Model
+from django.db import models
 from django.db.models.query import QuerySet
 from django.shortcuts import render
 from django.http import Http404
@@ -15,11 +16,50 @@ from .forms import PostForm, CommentForm
 User = get_user_model()
 
 
+class PostMixin:
+    model = Post
+    template_name = 'blog/create.html'
+
+    def get_success_url(self):
+        return reverse('blog:profile', kwargs={
+            'username': self.request.user.username}
+        )
+
+
+class PostFormMixin:
+    form_class = PostForm
+
+    def get_object(self):
+        return self.request.user
+
+    def form_valid(self, form):
+        form.instance.author = self.get_object()
+        return super().form_valid(form)
+
+
 class OnlyAuthorMixin(UserPassesTestMixin):
 
     def test_func(self):
         object = self.get_object()
         return object == self.request.user
+
+
+class PostCreateView(PostMixin, PostFormMixin, LoginRequiredMixin, CreateView):
+    login_url = '/auth/login/'
+
+
+class PostUpdateView(PostMixin, PostFormMixin, OnlyAuthorMixin, UpdateView):
+    pass
+
+
+class PostDeleteView(PostMixin, DeleteView):
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'form': PostForm(instance=self.object)
+        })
+        return context
 
 
 class ProfileListView(ListView):
@@ -51,47 +91,12 @@ class ProfileListView(ListView):
         return context
 
 
-class PostUpdateView(OnlyAuthorMixin, UpdateView):
-    model = Post
-    form_class = PostForm
-    template_name = 'blog/create.html'
-
-    def get_object(self):
-        return self.request.user
-
-    def form_valid(self, form):
-        form.instance.author = self.request.user
-        return super().form_valid(form)
-
-
-class CreatePostView(LoginRequiredMixin, CreateView):
-    model = Post
-    form_class = PostForm
-    template_name = 'blog/create.html'
-    login_url = '/auth/login/'
-
-    def get_object(self):
-        return self.request.user
-
-    def form_valid(self, form):
-        form.instance.author = self.request.user
-        return super().form_valid(form)
-
-    def get_success_url(self):
-        return reverse('blog:profile', kwargs={
-            'username': self.get_object().username}
-        )
-
-
 class ProfileUpdateView(UpdateView):
     template_name = 'blog/user.html'
     fields = ('username',
               'first_name',
               'last_name',
               'email')
-
-    def get_object(self):
-        return self.request.user
 
     def get_success_url(self):
         return reverse('blog:profile', kwargs={
@@ -103,16 +108,16 @@ class CommentCreateView(CreateView):
     form_class = CommentForm
     template_name = 'blog/comment.html'
 
-    def get_object(self):
-        return self.request.user
+    def get_object(self, **kwargs):
+        return self.kwargs
 
     def form_valid(self, form):
         form.instance.author = self.request.user
-        form.instance.post = Post.objects.get(pk=self.get_object().pk)
+        form.instance.post = Post.objects.get(pk=self.get_object()['pk'])
         return super().form_valid(form)
 
     def get_success_url(self):
-        return reverse('blog:post_detail', kwargs={'pk': self.get_object().pk})
+        return reverse('blog:post_detail', kwargs={'pk': self.get_object()['pk']})
 
 
 class CommentUpdateView(UpdateView):
@@ -136,10 +141,6 @@ class CommentDeleteView(DeleteView):
     model = Comment
     form_class = CommentForm
     template_name = 'blog/comment.html'
-
-
-class PostDeleteView(DeleteView):
-    model = Post
 
 
 def index(request):
@@ -168,7 +169,7 @@ def post_detail(request, pk):
     context = {
         'post': post,
         'form': form,
-        'comments': Comment.objects.filter(post=post).select_related('author')   
+        'comments': Comment.objects.filter(post=post).select_related('author')
     }
     return render(request, template_name, context)
 
@@ -188,4 +189,3 @@ def category_posts(request, category_slug):
         'page_obj': page_obj,
     }
     return render(request, template_name, context)
-
