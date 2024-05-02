@@ -9,8 +9,8 @@ from django.contrib.auth import get_user_model
 from django.views.generic import CreateView, UpdateView, ListView, TemplateView, DeleteView
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.utils import timezone
-from .models import Post, Category
-from .forms import PostForm
+from .models import Post, Category, Comment
+from .forms import PostForm, CommentForm
 
 User = get_user_model()
 
@@ -54,7 +54,7 @@ class ProfileListView(ListView):
 class PostUpdateView(OnlyAuthorMixin, UpdateView):
     model = Post
     form_class = PostForm
-    template_name = 'blog/detail.html'
+    template_name = 'blog/create.html'
 
     def get_object(self):
         return self.request.user
@@ -98,12 +98,48 @@ class ProfileUpdateView(UpdateView):
             'username': self.get_object().username})
 
 
+class CommentCreateView(CreateView):
+    model = Comment
+    form_class = CommentForm
+    template_name = 'blog/comment.html'
+
+    def get_object(self):
+        return self.request.user
+
+    def form_valid(self, form):
+        form.instance.author = self.request.user
+        form.instance.post = Post.objects.get(pk=self.get_object().pk)
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        return reverse('blog:post_detail', kwargs={'pk': self.get_object().pk})
+
+
+class CommentUpdateView(UpdateView):
+    model = Comment
+    form_class = CommentForm
+    template_name = 'blog/comment.html'
+
+    def get_object(self):
+        return self.request.comment
+
+    def form_valid(self, form):
+        form.instance.author = self.request.user
+        form.instance.post = Post.objects.get(pk=self.get_object().pk)
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        return reverse('blog:post_detail', kwargs={'post_pk': self.get_object().pk})
+
+
+class CommentDeleteView(DeleteView):
+    model = Comment
+    form_class = CommentForm
+    template_name = 'blog/comment.html'
+
+
 class PostDeleteView(DeleteView):
     model = Post
-
-
-class CommentCreateView(CreateView):
-    pass
 
 
 def index(request):
@@ -121,6 +157,7 @@ def index(request):
 
 def post_detail(request, pk):
     date_now = timezone.now()
+    form = CommentForm
     template_name = 'blog/detail.html'
     try:
         post = Post.objects.custom_filter(date_now).get(pk=pk)
@@ -130,6 +167,8 @@ def post_detail(request, pk):
         raise Http404
     context = {
         'post': post,
+        'form': form,
+        'comments': Comment.objects.filter(post=post).select_related('author')   
     }
     return render(request, template_name, context)
 

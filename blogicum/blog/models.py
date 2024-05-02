@@ -67,6 +67,19 @@ class Post(BaseModel):
         return self.title
 
 
+class Comment(models.Model):
+    post = models.ForeignKey(Post, on_delete=models.CASCADE,
+                             related_name='posts')
+    created_at = models.DateTimeField(auto_now_add=True,
+                                      verbose_name='Добавлено',)
+    author = models.ForeignKey(User, on_delete=models.CASCADE)
+
+    text = models.TextField('Текст комментария')
+
+    class Meta:
+        ordering = ('-created_at',)
+
+
 class Category(BaseModel):
     title = models.CharField(max_length=256, verbose_name='Заголовок')
     description = models.TextField(verbose_name='Описание')
