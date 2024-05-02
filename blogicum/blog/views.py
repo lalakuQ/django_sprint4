@@ -16,7 +16,14 @@ from .forms import PostForm, CommentForm
 User = get_user_model()
 
 
-class PostMixin:
+class OnlyAuthorMixin(UserPassesTestMixin):
+
+    def test_func(self):
+        object = self.get_object().author
+        return object == self.request.user
+
+
+class PostMixin(OnlyAuthorMixin, LoginRequiredMixin):
     model = Post
     template_name = 'blog/create.html'
 
@@ -29,26 +36,16 @@ class PostMixin:
 class PostFormMixin:
     form_class = PostForm
 
-    def get_object(self):
-        return self.request.user
-
     def form_valid(self, form):
         form.instance.author = self.get_object()
         return super().form_valid(form)
 
 
-class OnlyAuthorMixin(UserPassesTestMixin):
-
-    def test_func(self):
-        object = self.get_object()
-        return object == self.request.user
-
-
-class PostCreateView(PostMixin, PostFormMixin, LoginRequiredMixin, CreateView):
+class PostCreateView(PostMixin, PostFormMixin, CreateView):
     login_url = '/auth/login/'
 
 
-class PostUpdateView(PostMixin, PostFormMixin, OnlyAuthorMixin, UpdateView):
+class PostUpdateView(PostMixin, PostFormMixin, UpdateView):
     pass
 
 
@@ -117,7 +114,9 @@ class CommentCreateView(CreateView):
         return super().form_valid(form)
 
     def get_success_url(self):
-        return reverse('blog:post_detail', kwargs={'pk': self.get_object()['pk']})
+        return reverse('blog:post_detail', kwargs={
+            'pk': self.get_object()['pk']
+        })
 
 
 class CommentUpdateView(UpdateView):
