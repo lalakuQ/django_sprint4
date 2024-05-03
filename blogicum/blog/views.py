@@ -199,10 +199,9 @@ def post_detail(request, post_pk):
     date_now = timezone.now()
     template_name = 'blog/detail.html'
     form = CommentForm()
-    try:
-        post = get_object_or_404(Post.objects.select_related('author').get(pk=post_pk)
-    except ObjectDoesNotExist:
-        raise Http404
+
+    post = get_object_or_404(Post.objects.select_related('author'), 
+                             pk=post_pk)
 
     if (post.pub_date > date_now or not post.is_published) and (
             request.user != post.author):
