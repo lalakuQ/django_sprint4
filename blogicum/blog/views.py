@@ -1,7 +1,7 @@
 from django.db.models.base import Model
 from django.db import models
 from django.db.models.query import QuerySet
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.http import Http404
 from django.urls import reverse_lazy, reverse
 from django.core.paginator import Paginator
@@ -19,11 +19,11 @@ User = get_user_model()
 class OnlyAuthorMixin(UserPassesTestMixin):
 
     def test_func(self):
-        object = self.get_object().author
-        return object == self.request.user
+        object = self.get_object()
+        return object.author == self.request.user
 
 
-class PostMixin(OnlyAuthorMixin, LoginRequiredMixin):
+class PostMixin:
     model = Post
     template_name = 'blog/create.html'
 
@@ -41,15 +41,19 @@ class PostFormMixin:
         return super().form_valid(form)
 
 
-class PostCreateView(PostMixin, PostFormMixin, CreateView):
+class PostCreateView(LoginRequiredMixin, PostMixin, PostFormMixin, CreateView):
+
+    def get_object(self,):
+        return self.request.user
+
     login_url = '/auth/login/'
 
 
-class PostUpdateView(PostMixin, PostFormMixin, UpdateView):
+class PostUpdateView(PostMixin, OnlyAuthorMixin, PostFormMixin, UpdateView):
     pass
 
 
-class PostDeleteView(PostMixin, DeleteView):
+class PostDeleteView(PostMixin, OnlyAuthorMixin, DeleteView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
