@@ -89,10 +89,7 @@ class ProfileListView(ProfileMixin, ListView):
 
     def get_queryset(self):
         date_now = timezone.now()
-        try:
-            user = User.objects.get(username=self.kwargs['username'])
-        except ObjectDoesNotExist:
-            raise Http404
+        user = get_object_or_404(User, username=self.kwargs['username'])
         if self.request.user != user:
             queryset = Post.objects.custom_filter(date_now).filter(
                 author=user).annotate(
@@ -124,10 +121,7 @@ class ProfileUpdateView(CustomLoginRequiredMixin, ProfileMixin, UpdateView):
 
 class OnlyCommentAuthorMixin(UserPassesTestMixin):
     def get_object(self):
-        try:
-            comment = Comment.objects.get(pk=self.kwargs['comment_pk'])
-        except ObjectDoesNotExist:
-            raise Http404
+        comment = get_object_or_404(Comment, pk=self.kwargs['comment_pk'])
         return comment
 
     def test_func(self):
@@ -206,7 +200,7 @@ def post_detail(request, post_pk):
     template_name = 'blog/detail.html'
     form = CommentForm()
     try:
-        post = Post.objects.select_related('author').get(pk=post_pk)
+        post = get_object_or_404(Post.objects.select_related('author').get(pk=post_pk)
     except ObjectDoesNotExist:
         raise Http404
 
