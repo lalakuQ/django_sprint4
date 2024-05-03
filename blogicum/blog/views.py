@@ -1,6 +1,7 @@
 from django.db.models.base import Model
 from django.db import models
 from django.db.models.query import QuerySet
+from django.http.response import HttpResponseRedirect
 from django.shortcuts import render, redirect
 from django.http import Http404
 from django.urls import reverse_lazy, reverse
@@ -21,6 +22,9 @@ class OnlyAuthorMixin(UserPassesTestMixin):
     def test_func(self):
         object = self.get_object()
         return object.author == self.request.user
+
+    def handle_no_permission(self):
+        return redirect('blog:post_detail', pk=self.kwargs['pk'])
 
 
 class PostMixin:
