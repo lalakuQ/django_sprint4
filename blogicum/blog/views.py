@@ -104,8 +104,8 @@ class ProfileListView(ProfileMixin, ListView):
         queryset = queryset.order_by('-pub_date')
         return queryset
 
-    def get_context_data(self):
-        context = super().get_context_data()
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
         context.update({
             'profile': self.request.user
         })
@@ -167,8 +167,8 @@ class CommentUpdateView(UpdateView):
             'post_pk': self.get_data()['post'].pk}
         )
 
-    def get_context_data(self):
-        context = super().get_context_data()
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
         context.update({
             'comment': Comment.objects.get(pk=self.kwargs['comment_pk']),
         })
@@ -179,6 +179,22 @@ class CommentDeleteView(DeleteView):
     model = Comment
     form_class = CommentForm
     template_name = 'blog/comment.html'
+
+    def get_object(self):
+        comment = Comment.objects.get(pk=self.kwargs['comment_pk'])
+        return comment
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'form': CommentForm(instance=self.get_object())
+        })
+        return context
+
+    def get_success_url(self):
+        return reverse('blog:post_detail', kwargs={
+            'post_pk': self.kwargs['post_pk']}
+        )
 
 
 def index(request):
