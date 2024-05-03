@@ -142,7 +142,6 @@ class CommentCreateView(CreateView):
 
 
 class CommentUpdateView(UpdateView):
-    model = Comment
     form_class = CommentForm
     template_name = 'blog/comment.html'
 
@@ -177,7 +176,6 @@ class CommentUpdateView(UpdateView):
 
 class CommentDeleteView(DeleteView):
     model = Comment
-    form_class = CommentForm
     template_name = 'blog/comment.html'
 
     def get_object(self):
