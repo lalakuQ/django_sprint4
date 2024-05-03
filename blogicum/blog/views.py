@@ -1,14 +1,10 @@
-from django.db.models.base import Model
-from django.db import models
-from django.db.models.query import QuerySet
-from django.http.response import HttpResponseRedirect
-from django.shortcuts import render, redirect, get_object_or_404
+from django.shortcuts import render, redirect
 from django.http import Http404
-from django.urls import reverse_lazy, reverse
+from django.urls import reverse
 from django.core.paginator import Paginator
 from django.core.exceptions import ObjectDoesNotExist
 from django.contrib.auth import get_user_model
-from django.views.generic import CreateView, UpdateView, ListView, TemplateView, DeleteView
+from django.views.generic import CreateView, UpdateView, ListView, DeleteView
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.utils import timezone
 from .models import Post, Category, Comment
