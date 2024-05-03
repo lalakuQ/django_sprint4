@@ -34,28 +34,28 @@ class PostMixin:
     model = Post
     template_name = 'blog/create.html'
 
+    def get_user(self):
+        return self.request.user
+
     def get_success_url(self):
         return reverse('blog:profile', kwargs={
             'username': self.request.user.username}
         )
 
 
-class PostFormMixin:
+class PostFormMixin(PostMixin):
     form_class = PostForm
-
-    def get_user(self):
-        return self.request.user
 
     def form_valid(self, form):
         form.instance.author = self.get_user()
         return super().form_valid(form)
 
 
-class PostCreateView(LoginRequiredMixin, PostMixin, PostFormMixin, CreateView):
+class PostCreateView(LoginRequiredMixin, PostFormMixin, CreateView):
     login_url = '/auth/login/'
 
 
-class PostUpdateView(OnlyAuthorMixin, PostMixin, PostFormMixin, UpdateView):
+class PostUpdateView(OnlyAuthorMixin, PostFormMixin, UpdateView):
     pass
 
 
