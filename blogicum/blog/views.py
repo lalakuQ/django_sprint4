@@ -93,7 +93,6 @@ class ProfileListView(ProfileMixin, ListView):
     def get_queryset(self):
         date_now = timezone.now()
         user = User.objects.get(username=self.kwargs['username'])
-
         if self.request.user != user:
             queryset = Post.objects.custom_filter(date_now).filter(
                 author=user)
@@ -107,15 +106,13 @@ class ProfileListView(ProfileMixin, ListView):
 
     def get_context_data(self):
         context = super().get_context_data()
-        user = User.objects.get(username=self.kwargs['username'])
         context.update({
-            'profile': user,
+            'profile': self.request.user
         })
         return context
 
 
 class ProfileUpdateView(CustomLoginRequiredMixin, ProfileMixin, UpdateView):
-    model = User
     template_name = 'blog/user.html'
     form_class = UserForm
 
@@ -126,7 +123,6 @@ class ProfileUpdateView(CustomLoginRequiredMixin, ProfileMixin, UpdateView):
 
 
 class CommentCreateView(CreateView):
-    model = Comment
     form_class = CommentForm
     template_name = 'blog/comment.html'
 
@@ -145,12 +141,11 @@ class CommentCreateView(CreateView):
 
 
 class CommentUpdateView(UpdateView):
-    model = Comment
     form_class = CommentForm
     template_name = 'blog/comment.html'
 
     def get_object(self):
-        return self.request.comment
+        return self.kwargs['comment']
 
     def form_valid(self, form):
         form.instance.author = self.request.user
