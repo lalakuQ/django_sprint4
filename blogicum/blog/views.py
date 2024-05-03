@@ -3,7 +3,6 @@ from django.db.models import Count
 from django.http import Http404, Http404
 from django.urls import reverse
 from django.core.paginator import Paginator
-from django.core.exceptions import ObjectDoesNotExist
 from django.contrib.auth import get_user_model
 from django.views.generic import CreateView, UpdateView, ListView, DeleteView
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
@@ -21,8 +20,8 @@ class CustomLoginRequiredMixin(LoginRequiredMixin):
 class OnlyPostAuthorMixin(UserPassesTestMixin):
     def get_object(self):
         post_pk = self.kwargs.get('post_pk')
-        post_object = Post.objects.select_related(
-            'location', 'category', 'author', ).get(
+        post_object = get_object_or_404(Post.objects.select_related(
+            'location', 'category', 'author', ),
             pk=post_pk
         )
         return post_object
@@ -104,7 +103,7 @@ class ProfileListView(ProfileMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update({
-            'profile': User.objects.get(username=self.kwargs['username']),
+            'profile': get_object_or_404(User, username=self.kwargs['username']),
         })
         return context
 
@@ -200,7 +199,7 @@ def post_detail(request, post_pk):
     template_name = 'blog/detail.html'
     form = CommentForm()
 
-    post = get_object_or_404(Post.objects.select_related('author'), 
+    post = get_object_or_404(Post.objects.select_related('author'),
                              pk=post_pk)
 
     if (post.pub_date > date_now or not post.is_published) and (
@@ -218,7 +217,7 @@ def post_detail(request, post_pk):
 def category_posts(request, category_slug):
     date_now = timezone.now()
     template_name = 'blog/category.html'
-    category = Category.objects.get(slug=category_slug)
+    category = get_object_or_404(Category, slug=category_slug)
     if not category.is_published:
         raise Http404
     post_list = category.posts.custom_filter(date_now).annotate(
