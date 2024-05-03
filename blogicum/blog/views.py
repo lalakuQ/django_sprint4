@@ -21,7 +21,7 @@ class CustomLoginRequiredMixin(LoginRequiredMixin):
     login_url = '/auth/login'
 
 
-class OnlyAuthorMixin(UserPassesTestMixin):
+class OnlyPostAuthorMixin(UserPassesTestMixin):
     def get_object(self):
         post_pk = self.kwargs.get('post_pk')
         post_object = Post.objects.select_related(
@@ -66,11 +66,11 @@ class PostCreateView(CustomLoginRequiredMixin, PostFormMixin, CreateView):
     pass
 
 
-class PostUpdateView(OnlyAuthorMixin, PostFormMixin, UpdateView):
+class PostUpdateView(OnlyPostAuthorMixin, PostFormMixin, UpdateView):
     pass
 
 
-class PostDeleteView(OnlyAuthorMixin, PostMixin, DeleteView):
+class PostDeleteView(OnlyPostAuthorMixin, PostMixin, DeleteView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update({
@@ -122,49 +122,47 @@ class ProfileUpdateView(CustomLoginRequiredMixin, ProfileMixin, UpdateView):
         )
 
 
-class CommentCreateView(CreateView):
-
-    form_class = CommentForm
-    template_name = 'blog/comment.html'
-
-    def get_object(self, **kwargs):
-        return self.kwargs
-
-    def form_valid(self, form):
-        form.instance.author = self.request.user
-        form.instance.post = Post.objects.get(pk=self.get_object()['post_pk'])
-        return super().form_valid(form)
-
-    def get_success_url(self):
-        return reverse('blog:post_detail', kwargs={
-            'post_pk': self.get_object()['post_pk']
-        })
-
-
-class CommentUpdateView(UpdateView):
-    form_class = CommentForm
-    template_name = 'blog/comment.html'
-
+class OnlyCommentAuthorMixin(UserPassesTestMixin):
     def get_object(self):
         return Comment.objects.get(pk=self.kwargs['comment_pk'])
 
-    def get_data(self):
-        comment = Comment.objects.get(pk=self.kwargs['comment_pk'])
-        post = Post.objects.get(pk=self.kwargs['post_pk'])
-        data = {
-            'comment': comment,
-            'post': post
-        }
-        return data
+    def test_func(self):
+        object = self.get_object()
+        return object.author == self.request.user
 
-    def form_valid(self, form):
-        form.instance.comment = self.get_data()['comment']
-        return super().form_valid(form)
+
+class CommentMixin:
+    template_name = 'blog/comment.html'
 
     def get_success_url(self):
         return reverse('blog:post_detail', kwargs={
-            'post_pk': self.get_data()['post'].pk}
-        )
+            'post_pk': self.kwargs['post_pk']
+        })
+
+
+class CommentFormMixin:
+    form_class = CommentForm
+
+
+class CommentCreateView(CustomLoginRequiredMixin,
+                        CommentMixin,
+                        CommentFormMixin,
+                        CreateView):
+
+    def form_valid(self, form):
+        form.instance.author = self.request.user
+        form.instance.post = Post.objects.get(pk=self.kwargs['post_pk'])
+        return super().form_valid(form)
+
+
+class CommentUpdateView(OnlyCommentAuthorMixin,
+                        CommentMixin,
+                        CommentFormMixin,
+                        UpdateView):
+
+    def form_valid(self, form):
+        form.instance.comment = self.get_object()
+        return super().form_valid(form)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -174,13 +172,8 @@ class CommentUpdateView(UpdateView):
         return context
 
 
-class CommentDeleteView(DeleteView):
+class CommentDeleteView(OnlyCommentAuthorMixin, CommentMixin, DeleteView):
     model = Comment
-    template_name = 'blog/comment.html'
-
-    def get_object(self):
-        comment = Comment.objects.get(pk=self.kwargs['comment_pk'])
-        return comment
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -188,11 +181,6 @@ class CommentDeleteView(DeleteView):
             'form': CommentForm(instance=self.get_object())
         })
         return context
-
-    def get_success_url(self):
-        return reverse('blog:post_detail', kwargs={
-            'post_pk': self.kwargs['post_pk']}
-        )
 
 
 def index(request):
