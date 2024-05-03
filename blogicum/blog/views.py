@@ -12,18 +12,29 @@ from django.views.generic import CreateView, UpdateView, ListView, TemplateView,
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.utils import timezone
 from .models import Post, Category, Comment
-from .forms import PostForm, CommentForm
+from .forms import PostForm, CommentForm, UserForm
 
 User = get_user_model()
+
+
+class CustomLoginRequiredMixin(LoginRequiredMixin):
+    login_url = '/auth/login'
 
 
 class OnlyAuthorMixin(UserPassesTestMixin):
     def get_object(self):
         post_pk = self.kwargs.get('post_pk')
-        return get_object_or_404(Post, pk=post_pk)
+        post_object = Post.objects.select_related(
+            'location', 'category', 'author', ).get(
+            pk=post_pk
+        )
+        return post_object
 
     def test_func(self):
-        object = self.get_object()
+        post_pk = self.kwargs.get('post_pk')
+        object = Post.objects.select_related('author').get(
+            pk=post_pk
+        )
         return object.author == self.request.user
 
     def handle_no_permission(self):
@@ -51,8 +62,8 @@ class PostFormMixin(PostMixin):
         return super().form_valid(form)
 
 
-class PostCreateView(LoginRequiredMixin, PostFormMixin, CreateView):
-    login_url = '/auth/login/'
+class PostCreateView(CustomLoginRequiredMixin, PostFormMixin, CreateView):
+    pass
 
 
 class PostUpdateView(OnlyAuthorMixin, PostFormMixin, UpdateView):
@@ -69,7 +80,12 @@ class PostDeleteView(OnlyAuthorMixin, PostMixin, DeleteView):
         return context
 
 
-class ProfileListView(ListView):
+class ProfileMixin:
+    def get_object(self):
+        return self.request.user
+
+
+class ProfileListView(ProfileMixin, ListView):
     model = Post
     template_name = 'blog/profile.html'
     paginate_by = 10
@@ -98,16 +114,15 @@ class ProfileListView(ListView):
         return context
 
 
-class ProfileUpdateView(UpdateView):
+class ProfileUpdateView(CustomLoginRequiredMixin, ProfileMixin, UpdateView):
+    model = User
     template_name = 'blog/user.html'
-    fields = ('username',
-              'first_name',
-              'last_name',
-              'email')
+    form_class = UserForm
 
     def get_success_url(self):
         return reverse('blog:profile', kwargs={
-            'username': self.get_object().username})
+            'username': self.get_object().username}
+        )
 
 
 class CommentCreateView(CreateView):
@@ -125,7 +140,7 @@ class CommentCreateView(CreateView):
 
     def get_success_url(self):
         return reverse('blog:post_detail', kwargs={
-            'pk': self.get_object()['post_pk']
+            'post_pk': self.get_object()['post_pk']
         })
 
 
@@ -180,7 +195,7 @@ def post_detail(request, post_pk):
     context = {
         'post': post,
         'form': form,
-        'comments': Comment.objects.filter(post=post).select_related('author')
+        'comments': Comment.objects.select_related('author').filter(post=post),
     }
     return render(request, template_name, context)
 
