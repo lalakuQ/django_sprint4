@@ -18,13 +18,16 @@ User = get_user_model()
 
 
 class OnlyAuthorMixin(UserPassesTestMixin):
+    def get_object(self):
+        post_pk = self.kwargs.get('post_pk')
+        return get_object_or_404(Post, pk=post_pk)
 
     def test_func(self):
         object = self.get_object()
         return object.author == self.request.user
 
     def handle_no_permission(self):
-        return redirect('blog:post_detail', pk=self.kwargs['post_pk'])
+        return redirect('blog:post_detail', post_pk=self.kwargs['post_pk'])
 
 
 class PostMixin:
@@ -40,11 +43,11 @@ class PostMixin:
 class PostFormMixin:
     form_class = PostForm
 
-    def get_object(self):
+    def get_user(self):
         return self.request.user
 
     def form_valid(self, form):
-        form.instance.author = self.get_object()
+        form.instance.author = self.get_user()
         return super().form_valid(form)
 
 
@@ -52,20 +55,17 @@ class PostCreateView(LoginRequiredMixin, PostMixin, PostFormMixin, CreateView):
     login_url = '/auth/login/'
 
 
-class PostUpdateView(PostMixin, PostFormMixin, UpdateView):
+class PostUpdateView(OnlyAuthorMixin, PostMixin, PostFormMixin, UpdateView):
     pass
 
 
-class PostDeleteView(PostMixin, DeleteView):
-    def get_object(self):
-        post_pk = self.kwargs.get('post_pk')
-        return get_object_or_404(Post, pk=post_pk)
-
+class PostDeleteView(OnlyAuthorMixin, PostMixin, DeleteView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update({
             'form': PostForm(instance=self.object)
         })
+
         return context
 
 
