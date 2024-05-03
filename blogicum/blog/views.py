@@ -123,6 +123,7 @@ class ProfileUpdateView(CustomLoginRequiredMixin, ProfileMixin, UpdateView):
 
 
 class CommentCreateView(CreateView):
+
     form_class = CommentForm
     template_name = 'blog/comment.html'
 
@@ -141,21 +142,37 @@ class CommentCreateView(CreateView):
 
 
 class CommentUpdateView(UpdateView):
+    model = Comment
     form_class = CommentForm
     template_name = 'blog/comment.html'
 
     def get_object(self):
-        return self.kwargs['comment']
+        return Comment.objects.get(pk=self.kwargs['comment_pk'])
+
+    def get_data(self):
+        comment = Comment.objects.get(pk=self.kwargs['comment_pk'])
+        post = Post.objects.get(pk=self.kwargs['post_pk'])
+        data = {
+            'comment': comment,
+            'post': post
+        }
+        return data
 
     def form_valid(self, form):
-        form.instance.author = self.request.user
-        form.instance.post = Post.objects.get(pk=self.get_object().post_pk)
+        form.instance.comment = self.get_data()['comment']
         return super().form_valid(form)
 
     def get_success_url(self):
         return reverse('blog:post_detail', kwargs={
-            'post_pk': self.get_object().post_pk}
+            'post_pk': self.get_data()['post'].pk}
         )
+
+    def get_context_data(self):
+        context = super().get_context_data()
+        context.update({
+            'comment': Comment.objects.get(pk=self.kwargs['comment_pk']),
+        })
+        return context
 
 
 class CommentDeleteView(DeleteView):
