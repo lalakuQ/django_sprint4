@@ -1,5 +1,6 @@
-from django.shortcuts import render, redirect
-from django.http import Http404
+from django.shortcuts import render, redirect, get_object_or_404
+from django.db.models import Count
+from django.http import Http404, Http404
 from django.urls import reverse
 from django.core.paginator import Paginator
 from django.core.exceptions import ObjectDoesNotExist
@@ -27,9 +28,9 @@ class OnlyPostAuthorMixin(UserPassesTestMixin):
         return post_object
 
     def test_func(self):
-        post_pk = self.kwargs.get('post_pk')
-        object = Post.objects.select_related('author').get(
-            pk=post_pk
+        object = get_object_or_404(
+            Post.objects.select_related('author'),
+            pk=self.kwargs['post_pk']
         )
         return object.author == self.request.user
 
@@ -88,22 +89,25 @@ class ProfileListView(ProfileMixin, ListView):
 
     def get_queryset(self):
         date_now = timezone.now()
-        user = User.objects.get(username=self.kwargs['username'])
+        try:
+            user = User.objects.get(username=self.kwargs['username'])
+        except ObjectDoesNotExist:
+            raise Http404
         if self.request.user != user:
             queryset = Post.objects.custom_filter(date_now).filter(
-                author=user)
+                author=user).annotate(
+                    comment_count=Count('comments')).order_by('-pub_date')
         else:
             queryset = Post.objects.select_related(
                 'location', 'category', 'author').filter(
                 author=user
-            )
-        queryset = queryset.order_by('-pub_date')
+            ).annotate(comment_count=Count('comments')).order_by('-pub_date')
         return queryset
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update({
-            'profile': self.request.user
+            'profile': User.objects.get(username=self.kwargs['username']),
         })
         return context
 
@@ -120,7 +124,11 @@ class ProfileUpdateView(CustomLoginRequiredMixin, ProfileMixin, UpdateView):
 
 class OnlyCommentAuthorMixin(UserPassesTestMixin):
     def get_object(self):
-        return Comment.objects.get(pk=self.kwargs['comment_pk'])
+        try:
+            comment = Comment.objects.get(pk=self.kwargs['comment_pk'])
+        except ObjectDoesNotExist:
+            raise Http404
+        return comment
 
     def test_func(self):
         object = self.get_object()
@@ -145,9 +153,14 @@ class CommentCreateView(CustomLoginRequiredMixin,
                         CommentFormMixin,
                         CreateView):
 
+    def get(self, request, *args, **kwargs):
+
+        self.post_obj = get_object_or_404(Post, pk=self.kwargs['post_pk'])
+        return super().get(request, *args, **kwargs)
+
     def form_valid(self, form):
         form.instance.author = self.request.user
-        form.instance.post = Post.objects.get(pk=self.kwargs['post_pk'])
+        form.instance.post = get_object_or_404(Post, pk=self.kwargs['post_pk'])
         return super().form_valid(form)
 
 
@@ -163,49 +176,48 @@ class CommentUpdateView(OnlyCommentAuthorMixin,
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update({
-            'comment': Comment.objects.get(pk=self.kwargs['comment_pk']),
+            'comment': self.get_object()
         })
         return context
 
 
 class CommentDeleteView(OnlyCommentAuthorMixin, CommentMixin, DeleteView):
     model = Comment
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context.update({
-            'form': CommentForm(instance=self.get_object())
-        })
-        return context
+    form_class = CommentForm
 
 
 def index(request):
     date_now = timezone.now()
     template_name = 'blog/index.html'
-    post_list = Post.objects.custom_filter(date_now)
+    post_list = Post.objects.custom_filter(date_now).annotate(
+        comment_count=Count('comments')).order_by('-pub_date')
     paginator = Paginator(post_list, 10)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     context = {
         'page_obj': page_obj,
+        'comment_count': post_list.values('comment_count'),
     }
     return render(request, template_name, context)
 
 
 def post_detail(request, post_pk):
     date_now = timezone.now()
-    form = CommentForm
     template_name = 'blog/detail.html'
+    form = CommentForm()
     try:
-        post = Post.objects.custom_filter(date_now).get(pk=post_pk)
-        if not post:
-            raise Http404
+        post = Post.objects.select_related('author').get(pk=post_pk)
     except ObjectDoesNotExist:
+        raise Http404
+
+    if (post.pub_date > date_now or not post.is_published) and (
+            request.user != post.author):
         raise Http404
     context = {
         'post': post,
         'form': form,
-        'comments': Comment.objects.select_related('author').filter(post=post),
+        'comments': Comment.objects.select_related('author').filter(
+            post=post).order_by('created_at')
     }
     return render(request, template_name, context)
 
@@ -214,12 +226,13 @@ def category_posts(request, category_slug):
     date_now = timezone.now()
     template_name = 'blog/category.html'
     category = Category.objects.get(slug=category_slug)
-    post_list = category.posts.custom_filter(date_now)
+    if not category.is_published:
+        raise Http404
+    post_list = category.posts.custom_filter(date_now).annotate(
+        comment_count=Count('comments')).order_by('-pub_date')
     paginator = Paginator(post_list, 10)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
-    if not post_list:
-        raise Http404
     context = {
         'category': category,
         'page_obj': page_obj,
