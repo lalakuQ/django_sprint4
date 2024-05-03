@@ -85,25 +85,26 @@ class ProfileListView(ProfileMixin, ListView):
     model = Post
     template_name = 'blog/profile.html'
     paginate_by = 10
+    user = None
 
     def get_queryset(self):
         date_now = timezone.now()
-        user = get_object_or_404(User, username=self.kwargs['username'])
-        if self.request.user != user:
+        self.user = get_object_or_404(User, username=self.kwargs['username'])
+        if self.request.user != self.user:
             queryset = Post.objects.custom_filter(date_now).filter(
-                author=user).annotate(
+                author=self.user).annotate(
                     comment_count=Count('comments')).order_by('-pub_date')
         else:
             queryset = Post.objects.select_related(
                 'location', 'category', 'author').filter(
-                author=user
+                author=self.user
             ).annotate(comment_count=Count('comments')).order_by('-pub_date')
         return queryset
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update({
-            'profile': get_object_or_404(User, username=self.kwargs['username']),
+            'profile': self.user,
         })
         return context
 
@@ -147,7 +148,6 @@ class CommentCreateView(CustomLoginRequiredMixin,
                         CreateView):
 
     def get(self, request, *args, **kwargs):
-
         self.post_obj = get_object_or_404(Post, pk=self.kwargs['post_pk'])
         return super().get(request, *args, **kwargs)
 
