@@ -40,34 +40,27 @@ class PostMixin:
 class PostFormMixin:
     form_class = PostForm
 
+    def get_object(self):
+        return self.request.user
+
     def form_valid(self, form):
         form.instance.author = self.get_object()
         return super().form_valid(form)
 
 
 class PostCreateView(LoginRequiredMixin, PostMixin, PostFormMixin, CreateView):
-
-    def get_object(self):
-        return self.request.user
-
     login_url = '/auth/login/'
 
 
 class PostUpdateView(PostMixin, PostFormMixin, UpdateView):
-    def get_object(self):
-        return self.request.user
+    pass
 
 
-class PostDeleteView(DeleteView):
-    model = Post
-    template_name = 'blog/create.html'
+class PostDeleteView(PostMixin, DeleteView):
     def get_object(self):
         post_pk = self.kwargs.get('post_pk')
         return get_object_or_404(Post, pk=post_pk)
-    def get_success_url(self):
-        return reverse('blog:profile', kwargs={
-            'username': self.request.user.username}
-        )
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update({
