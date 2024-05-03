@@ -2,7 +2,7 @@ from django.db.models.base import Model
 from django.db import models
 from django.db.models.query import QuerySet
 from django.http.response import HttpResponseRedirect
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.http import Http404
 from django.urls import reverse_lazy, reverse
 from django.core.paginator import Paginator
@@ -24,7 +24,7 @@ class OnlyAuthorMixin(UserPassesTestMixin):
         return object.author == self.request.user
 
     def handle_no_permission(self):
-        return redirect('blog:post_detail', pk=self.kwargs['pk'])
+        return redirect('blog:post_detail', pk=self.kwargs['post_pk'])
 
 
 class PostMixin:
@@ -47,18 +47,27 @@ class PostFormMixin:
 
 class PostCreateView(LoginRequiredMixin, PostMixin, PostFormMixin, CreateView):
 
-    def get_object(self,):
+    def get_object(self):
         return self.request.user
 
     login_url = '/auth/login/'
 
 
-class PostUpdateView(PostMixin, OnlyAuthorMixin, PostFormMixin, UpdateView):
-    pass
+class PostUpdateView(PostMixin, PostFormMixin, UpdateView):
+    def get_object(self):
+        return self.request.user
 
 
-class PostDeleteView(PostMixin, OnlyAuthorMixin, DeleteView):
-
+class PostDeleteView(DeleteView):
+    model = Post
+    template_name = 'blog/create.html'
+    def get_object(self):
+        post_pk = self.kwargs.get('post_pk')
+        return get_object_or_404(Post, pk=post_pk)
+    def get_success_url(self):
+        return reverse('blog:profile', kwargs={
+            'username': self.request.user.username}
+        )
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update({
@@ -118,12 +127,12 @@ class CommentCreateView(CreateView):
 
     def form_valid(self, form):
         form.instance.author = self.request.user
-        form.instance.post = Post.objects.get(pk=self.get_object()['pk'])
+        form.instance.post = Post.objects.get(pk=self.get_object()['post_pk'])
         return super().form_valid(form)
 
     def get_success_url(self):
         return reverse('blog:post_detail', kwargs={
-            'pk': self.get_object()['pk']
+            'pk': self.get_object()['post_pk']
         })
 
 
@@ -137,11 +146,13 @@ class CommentUpdateView(UpdateView):
 
     def form_valid(self, form):
         form.instance.author = self.request.user
-        form.instance.post = Post.objects.get(pk=self.get_object().pk)
+        form.instance.post = Post.objects.get(pk=self.get_object().post_pk)
         return super().form_valid(form)
 
     def get_success_url(self):
-        return reverse('blog:post_detail', kwargs={'post_pk': self.get_object().pk})
+        return reverse('blog:post_detail', kwargs={
+            'post_pk': self.get_object().post_pk}
+        )
 
 
 class CommentDeleteView(DeleteView):
@@ -163,12 +174,12 @@ def index(request):
     return render(request, template_name, context)
 
 
-def post_detail(request, pk):
+def post_detail(request, post_pk):
     date_now = timezone.now()
     form = CommentForm
     template_name = 'blog/detail.html'
     try:
-        post = Post.objects.custom_filter(date_now).get(pk=pk)
+        post = Post.objects.custom_filter(date_now).get(pk=post_pk)
         if not post:
             raise Http404
     except ObjectDoesNotExist:
