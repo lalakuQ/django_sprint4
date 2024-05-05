@@ -14,7 +14,6 @@ from .mixins import (
     PostMixin,
     PostFormMixin,
     OnlyCommentAuthorMixin,
-    CommentMixin,
     CommentFormMixin
 )
 from .utils import get_page_obj
