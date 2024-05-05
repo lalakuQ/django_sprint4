@@ -1,61 +1,26 @@
-from django.shortcuts import render, redirect, get_object_or_404
+from django.shortcuts import render, get_object_or_404
 from django.db.models import Count
 from django.http import Http404, Http404
 from django.urls import reverse
-from django.core.paginator import Paginator
 from django.contrib.auth import get_user_model
 from django.views.generic import CreateView, UpdateView, ListView, DeleteView
-from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.utils import timezone
 from .models import Post, Category, Comment
 from .forms import PostForm, CommentForm, UserForm
+from .mixins import (
+    CustomLoginRequiredMixin,
+    OnlyPostAuthorMixin,
+    ProfileMixin,
+    PostMixin,
+    PostFormMixin,
+    OnlyCommentAuthorMixin,
+    CommentMixin,
+    CommentFormMixin
+)
+from .utils import get_page_obj
+
 
 User = get_user_model()
-
-
-class CustomLoginRequiredMixin(LoginRequiredMixin):
-    login_url = '/auth/login'
-
-
-class OnlyPostAuthorMixin(UserPassesTestMixin):
-    def get_object(self):
-        post_pk = self.kwargs.get('post_pk')
-        post_object = get_object_or_404(Post.objects.select_related(
-            'location', 'category', 'author', ),
-            pk=post_pk
-        )
-        return post_object
-
-    def test_func(self):
-        object = get_object_or_404(
-            Post.objects.select_related('author'),
-            pk=self.kwargs['post_pk']
-        )
-        return object.author == self.request.user
-
-    def handle_no_permission(self):
-        return redirect('blog:post_detail', post_pk=self.kwargs['post_pk'])
-
-
-class PostMixin:
-    model = Post
-    template_name = 'blog/create.html'
-
-    def get_user(self):
-        return self.request.user
-
-    def get_success_url(self):
-        return reverse('blog:profile', kwargs={
-            'username': self.request.user.username}
-        )
-
-
-class PostFormMixin(PostMixin):
-    form_class = PostForm
-
-    def form_valid(self, form):
-        form.instance.author = self.get_user()
-        return super().form_valid(form)
 
 
 class PostCreateView(CustomLoginRequiredMixin, PostFormMixin, CreateView):
@@ -74,11 +39,6 @@ class PostDeleteView(OnlyPostAuthorMixin, PostMixin, DeleteView):
         })
 
         return context
-
-
-class ProfileMixin:
-    def get_object(self):
-        return self.request.user
 
 
 class ProfileListView(ProfileMixin, ListView):
@@ -117,29 +77,6 @@ class ProfileUpdateView(CustomLoginRequiredMixin, ProfileMixin, UpdateView):
         return reverse('blog:profile', kwargs={
             'username': self.get_object().username}
         )
-
-
-class OnlyCommentAuthorMixin(UserPassesTestMixin):
-    def get_object(self):
-        comment = get_object_or_404(Comment, pk=self.kwargs['comment_pk'])
-        return comment
-
-    def test_func(self):
-        object = self.get_object()
-        return object.author == self.request.user
-
-
-class CommentMixin:
-    template_name = 'blog/comment.html'
-
-    def get_success_url(self):
-        return reverse('blog:post_detail', kwargs={
-            'post_pk': self.kwargs['post_pk']
-        })
-
-
-class CommentFormMixin:
-    form_class = CommentForm
 
 
 class CommentCreateView(CustomLoginRequiredMixin,
@@ -184,9 +121,7 @@ def index(request):
     template_name = 'blog/index.html'
     post_list = Post.objects.custom_filter(date_now).annotate(
         comment_count=Count('comments')).order_by('-pub_date')
-    paginator = Paginator(post_list, 10)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    page_obj = get_page_obj(post_list, request)
     context = {
         'page_obj': page_obj,
         'comment_count': post_list.values('comment_count'),
@@ -222,9 +157,7 @@ def category_posts(request, category_slug):
         raise Http404
     post_list = category.posts.custom_filter(date_now).annotate(
         comment_count=Count('comments')).order_by('-pub_date')
-    paginator = Paginator(post_list, 10)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    page_obj = get_page_obj(post_list, request)
     context = {
         'category': category,
         'page_obj': page_obj,
