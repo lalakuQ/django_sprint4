@@ -91,7 +91,9 @@ class CommentUpdateView(OnlyCommentAuthorMixin,
     pass
 
 
-class CommentDeleteView(OnlyCommentAuthorMixin, CommentForm, DeleteView):
+class CommentDeleteView(OnlyCommentAuthorMixin,
+                        CommentFormMixin,
+                        DeleteView):
 
     pass
 
