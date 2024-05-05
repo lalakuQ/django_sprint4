@@ -80,40 +80,20 @@ class ProfileUpdateView(CustomLoginRequiredMixin, ProfileMixin, UpdateView):
 
 
 class CommentCreateView(CustomLoginRequiredMixin,
-                        CommentMixin,
                         CommentFormMixin,
                         CreateView):
-
-    def get(self, request, *args, **kwargs):
-        self.post_obj = get_object_or_404(Post, pk=self.kwargs['post_pk'])
-        return super().get(request, *args, **kwargs)
-
-    def form_valid(self, form):
-        form.instance.author = self.request.user
-        form.instance.post = get_object_or_404(Post, pk=self.kwargs['post_pk'])
-        return super().form_valid(form)
+    pass
 
 
 class CommentUpdateView(OnlyCommentAuthorMixin,
-                        CommentMixin,
                         CommentFormMixin,
                         UpdateView):
-
-    def form_valid(self, form):
-        form.instance.comment = self.get_object()
-        return super().form_valid(form)
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context.update({
-            'comment': self.get_object()
-        })
-        return context
+    pass
 
 
-class CommentDeleteView(OnlyCommentAuthorMixin, CommentMixin, DeleteView):
-    model = Comment
-    form_class = CommentForm
+class CommentDeleteView(OnlyCommentAuthorMixin, CommentForm, DeleteView):
+
+    pass
 
 
 def index(request):
